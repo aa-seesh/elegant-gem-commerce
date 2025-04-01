@@ -1,0 +1,247 @@
+
+import React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { ImagePlus } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Define the form schema
+const productSchema = z.object({
+  name: z.string().min(2, "Product name is required"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  price: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, "Price must be a positive number"),
+  category: z.string().min(1, "Category is required"),
+  sku: z.string().min(1, "SKU is required"),
+  stock: z.string().refine(val => !isNaN(Number(val)) && Number(val) >= 0, "Stock must be a non-negative number"),
+  materials: z.string(),
+  dimensions: z.string().optional(),
+  images: z.array(z.string()).default([]),
+});
+
+export type ProductFormValues = z.infer<typeof productSchema>;
+
+interface AddProductDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: ProductFormValues) => void;
+}
+
+export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDialogProps) {
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      sku: "",
+      stock: "",
+      materials: "",
+      dimensions: "",
+      images: [],
+    },
+  });
+
+  function handleSubmit(values: ProductFormValues) {
+    // Convert string values to numbers
+    const formattedValues = {
+      ...values,
+      price: Number(values.price),
+      stock: Number(values.stock),
+      materials: values.materials.split(',').map(item => item.trim()),
+      // In a real app, we would handle image uploads here
+      images: values.images.length ? values.images : [
+        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80"
+      ],
+      // Add additional required fields with default values
+      tags: [values.category],
+      rating: 0,
+      reviews: 0,
+    };
+    onSubmit(formattedValues);
+    form.reset();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add New Product</DialogTitle>
+          <DialogDescription>
+            Fill in the details below to add a new product to your inventory.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Diamond Enchantment Necklace" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" placeholder="1299.99" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="necklaces">Necklaces</SelectItem>
+                          <SelectItem value="rings">Rings</SelectItem>
+                          <SelectItem value="earrings">Earrings</SelectItem>
+                          <SelectItem value="bracelets">Bracelets</SelectItem>
+                          <SelectItem value="watches">Watches</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" placeholder="15" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="sku"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>SKU</FormLabel>
+                      <FormControl>
+                        <Input placeholder="DN-1001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="A stunning 18K gold necklace with a perfect diamond pendant..." 
+                          className="resize-none min-h-[120px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="materials"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Materials</FormLabel>
+                      <FormControl>
+                        <Input placeholder="18K Gold, Diamond" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Separate materials with commas
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dimensions"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dimensions (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Chain: 18 inches, Pendant: 0.5 inches" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {/* Image upload placeholder - in a real app, you would implement file uploads */}
+                <div className="border-2 border-dashed border-gray-300 rounded-md p-6 flex flex-col items-center justify-center">
+                  <ImagePlus className="h-10 w-10 text-gray-400 mb-2" />
+                  <p className="text-sm font-medium">Upload product images</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Drag & drop or click to browse files
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-4">
+                    Select Files
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button className="bg-gold hover:bg-gold-dark" type="submit">
+                Add Product
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

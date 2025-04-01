@@ -18,6 +18,7 @@ import {
   Settings,
   Users,
   BarChart2,
+  ImagePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,10 +36,12 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
+import { AddProductDialog } from "@/components/admin/AddProductDialog";
 
 const AdminProducts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const { toast } = useToast();
   
   // Filter products based on search term
@@ -71,6 +74,16 @@ const AdminProducts = () => {
       description: "The product has been successfully deleted",
     });
     // In a real app, you would delete the product from the database
+  };
+
+  // Add product handler
+  const handleAddProduct = (productData) => {
+    toast({
+      title: "Product added",
+      description: "The product has been successfully added",
+    });
+    setIsAddProductOpen(false);
+    // In a real app, you would add the product to the database
   };
   
   return (
@@ -164,7 +177,10 @@ const AdminProducts = () => {
               <p className="text-muted-foreground">Manage your product inventory</p>
             </div>
             
-            <Button className="bg-gold hover:bg-gold-dark">
+            <Button 
+              className="bg-gold hover:bg-gold-dark"
+              onClick={() => setIsAddProductOpen(true)}
+            >
               <Plus className="mr-2 h-4 w-4" /> Add Product
             </Button>
           </div>
@@ -341,6 +357,13 @@ const AdminProducts = () => {
           </Card>
         </main>
       </div>
+
+      {/* Add Product Dialog */}
+      <AddProductDialog 
+        open={isAddProductOpen} 
+        onOpenChange={setIsAddProductOpen} 
+        onSubmit={handleAddProduct}
+      />
     </div>
   );
 };
