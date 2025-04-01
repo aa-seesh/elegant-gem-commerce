@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,19 +10,46 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 // Define the form schema
 const productSchema = z.object({
   name: z.string().min(2, "Product name is required"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  price: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, "Price must be a positive number"),
+  pricingType: z.enum(["flat", "dynamic"]),
+  price: z.string().optional(),
+  weight: z.string().optional(),
+  pricePerGram: z.string().optional(),
+  makingCharge: z.string().optional(),
   category: z.string().min(1, "Category is required"),
   sku: z.string().min(1, "SKU is required"),
   stock: z.string().refine(val => !isNaN(Number(val)) && Number(val) >= 0, "Stock must be a non-negative number"),
   materials: z.string(),
   dimensions: z.string().optional(),
   images: z.array(z.string()).default([]),
-});
+}).refine(
+  (data) => {
+    // If pricing type is flat, price must be provided
+    if (data.pricingType === "flat") {
+      return !!data.price && !isNaN(Number(data.price)) && Number(data.price) > 0;
+    }
+    
+    // If pricing type is dynamic, weight, pricePerGram, and makingCharge must be provided
+    if (data.pricingType === "dynamic") {
+      return (
+        !!data.weight && !isNaN(Number(data.weight)) && Number(data.weight) > 0 &&
+        !!data.pricePerGram && !isNaN(Number(data.pricePerGram)) && Number(data.pricePerGram) >= 0 &&
+        !!data.makingCharge && !isNaN(Number(data.makingCharge)) && Number(data.makingCharge) >= 0
+      );
+    }
+    
+    return false;
+  },
+  {
+    message: "Please provide valid pricing information",
+    path: ["pricingType"],
+  }
+);
 
 export type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -37,7 +65,11 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
     defaultValues: {
       name: "",
       description: "",
+      pricingType: "flat",
       price: "",
+      weight: "",
+      pricePerGram: "",
+      makingCharge: "",
       category: "",
       sku: "",
       stock: "",
@@ -47,12 +79,29 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
     },
   });
 
+  const pricingType = form.watch("pricingType");
+  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+
+  // Calculate dynamic price when inputs change
+  React.useEffect(() => {
+    if (pricingType === "dynamic") {
+      const weight = Number(form.getValues("weight"));
+      const pricePerGram = Number(form.getValues("pricePerGram"));
+      const makingCharge = Number(form.getValues("makingCharge"));
+      
+      if (weight > 0 && pricePerGram >= 0 && makingCharge >= 0) {
+        const totalPrice = (weight * pricePerGram) + makingCharge;
+        setCalculatedPrice(totalPrice);
+      } else {
+        setCalculatedPrice(null);
+      }
+    }
+  }, [pricingType, form.watch("weight"), form.watch("pricePerGram"), form.watch("makingCharge"), form]);
+
   function handleSubmit(values: ProductFormValues) {
-    // Prepare the form values - keep them as strings as expected by the onSubmit prop
+    // Prepare the form values for submission
     const formattedValues = {
       ...values,
-      // Split materials into an array but keep them as a string in the form values
-      materials: values.materials,
       // In a real app, we would handle image uploads here
       images: values.images.length ? values.images : [
         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80"
@@ -92,17 +141,131 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
 
                 <FormField
                   control={form.control}
-                  name="price"
+                  name="pricingType"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price ($)</FormLabel>
+                    <FormItem className="space-y-3">
+                      <FormLabel>Pricing Type</FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" placeholder="1299.99" {...field} />
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="flat" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Flat Rate
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="dynamic" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Dynamic (Weight Based)
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {pricingType === "flat" ? (
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price ($)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            placeholder="1299.99" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div className="space-y-4 p-4 border border-gray-200 rounded-md">
+                    <FormField
+                      control={form.control}
+                      name="weight"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Weight (grams)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.001" 
+                              placeholder="5.5" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="pricePerGram"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Gram ($)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.01" 
+                              placeholder="65.50" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="makingCharge"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Making Charge ($)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.01" 
+                              placeholder="299.99" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {calculatedPrice !== null && (
+                      <div className="text-sm font-medium mt-2 p-2 bg-muted rounded">
+                        <p>Calculated Price: <span className="text-gold">${calculatedPrice.toFixed(2)}</span></p>
+                        <p className="text-xs text-muted-foreground">
+                          ({form.getValues("weight")} g × ${form.getValues("pricePerGram")}/g) + ${form.getValues("makingCharge")} making charge
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}
@@ -131,6 +294,26 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="A stunning 18K gold necklace with a perfect diamond pendant..." 
+                          className="resize-none min-h-[120px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -154,26 +337,6 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                       <FormLabel>SKU</FormLabel>
                       <FormControl>
                         <Input placeholder="DN-1001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="A stunning 18K gold necklace with a perfect diamond pendant..." 
-                          className="resize-none min-h-[120px]"
-                          {...field} 
-                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
