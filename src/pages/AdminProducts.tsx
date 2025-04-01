@@ -254,7 +254,7 @@ const AdminProducts = () => {
                         <div className="flex items-center gap-3">
                           <div className="bg-muted rounded-md w-10 h-10 overflow-hidden flex-shrink-0">
                             <img 
-                              src={product.image} 
+                              src={product.images[0]} 
                               alt={product.name} 
                               className="w-full h-full object-cover"
                             />
