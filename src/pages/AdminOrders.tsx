@@ -100,7 +100,7 @@ const orders = [
 
 const AdminOrders = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
 
   // Filter orders by search term and status
@@ -109,7 +109,7 @@ const AdminOrders = () => {
       (order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "" || order.status === statusFilter)
+      (statusFilter === "all" || order.status === statusFilter)
   );
 
   const getStatusBadge = (status) => {
@@ -269,7 +269,7 @@ const AdminOrders = () => {
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Statuses</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="processing">Processing</SelectItem>
                     <SelectItem value="shipped">Shipped</SelectItem>
                     <SelectItem value="delivered">Delivered</SelectItem>
@@ -354,7 +354,7 @@ const AdminOrders = () => {
                           <Button 
                             onClick={() => {
                               setSearchTerm("");
-                              setStatusFilter("");
+                              setStatusFilter("all");
                             }}
                           >
                             Clear filters
