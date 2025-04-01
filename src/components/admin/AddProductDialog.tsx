@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,20 +48,15 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
   });
 
   function handleSubmit(values: ProductFormValues) {
-    // Convert string values to numbers
+    // Prepare the form values - keep them as strings as expected by the onSubmit prop
     const formattedValues = {
       ...values,
-      price: Number(values.price),
-      stock: Number(values.stock),
-      materials: values.materials.split(',').map(item => item.trim()),
+      // Split materials into an array but keep them as a string in the form values
+      materials: values.materials,
       // In a real app, we would handle image uploads here
       images: values.images.length ? values.images : [
         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80"
       ],
-      // Add additional required fields with default values
-      tags: [values.category],
-      rating: 0,
-      reviews: 0,
     };
     onSubmit(formattedValues);
     form.reset();
