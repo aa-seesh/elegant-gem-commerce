@@ -20,6 +20,7 @@ const shimmerButtonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         gold: "bg-gradient-to-r from-gold-light via-gold to-gold-dark text-white shadow-md hover:shadow-lg hover:brightness-105",
+        luxury: "bg-gradient-to-r from-gold/80 to-gold border border-gold/30 text-white shadow-md hover:shadow-lg hover:brightness-105",
       },
       size: {
         default: "h-10 px-4 py-2",
