@@ -5,8 +5,10 @@ import { Heart, ShoppingBag, Share2, ChevronRight, Star, Truck, Package, Shield 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { getProductById, featuredProducts } from "@/data/products";
+import { getProductById, featuredProducts, ProductVariant } from "@/data/products";
 import FeaturedCollection from "@/components/FeaturedCollection";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const ProductPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +16,9 @@ const ProductPage = () => {
   
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  // For products with variants
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   
   if (!product) {
     return (
@@ -33,6 +38,31 @@ const ProductPage = () => {
     );
   }
 
+  // Find matching variant based on selected attributes
+  const findMatchingVariant = () => {
+    if (!product.variants || product.variants.length === 0) return null;
+    
+    const attributeKeys = Object.keys(selectedAttributes);
+    if (attributeKeys.length === 0) return product.variants[0]; // Default to first variant
+    
+    return product.variants.find(variant => 
+      attributeKeys.every(key => variant.attributes[key] === selectedAttributes[key])
+    ) || null;
+  };
+
+  // Update selectedVariant when attributes change
+  React.useEffect(() => {
+    if (product?.hasVariants && product.variants) {
+      const variant = findMatchingVariant();
+      setSelectedVariant(variant);
+      
+      // If variant has its own images, show the first one
+      if (variant && variant.images && variant.images.length > 0) {
+        setSelectedImage(0); // Reset to first image of new variant
+      }
+    }
+  }, [selectedAttributes, product]);
+
   const handleDecreaseQuantity = () => {
     if (quantity > 1) {
       setQuantity(quantity - 1);
@@ -40,10 +70,54 @@ const ProductPage = () => {
   };
 
   const handleIncreaseQuantity = () => {
-    if (quantity < product.stock) {
+    const maxStock = selectedVariant ? selectedVariant.stock : product.stock;
+    if (quantity < maxStock) {
       setQuantity(quantity + 1);
     }
   };
+  
+  // Get unique attribute names from variants
+  const getAttributeNames = () => {
+    if (!product.variants || product.variants.length === 0) return [];
+    
+    const allAttributes = new Set<string>();
+    product.variants.forEach(variant => {
+      Object.keys(variant.attributes).forEach(attr => allAttributes.add(attr));
+    });
+    
+    return Array.from(allAttributes);
+  };
+  
+  // Get unique values for a specific attribute
+  const getAttributeValues = (attributeName: string) => {
+    if (!product.variants) return [];
+    
+    const values = new Set<string>();
+    product.variants.forEach(variant => {
+      if (variant.attributes[attributeName]) {
+        values.add(variant.attributes[attributeName]);
+      }
+    });
+    
+    return Array.from(values);
+  };
+  
+  // Handle attribute selection
+  const handleAttributeChange = (attributeName: string, value: string) => {
+    setSelectedAttributes(prev => ({
+      ...prev,
+      [attributeName]: value
+    }));
+  };
+  
+  // Get current price and stock
+  const currentPrice = selectedVariant ? selectedVariant.price : product.price;
+  const currentStock = selectedVariant ? selectedVariant.stock : product.stock;
+  
+  // Get images to display
+  const displayImages = selectedVariant && selectedVariant.images && selectedVariant.images.length > 0 
+    ? selectedVariant.images 
+    : product.images;
   
   const relatedProducts = featuredProducts
     .filter(p => p.id !== product.id && (p.category === product.category || p.tags.some(tag => product.tags.includes(tag))))
@@ -76,7 +150,7 @@ const ProductPage = () => {
               {/* Main Image */}
               <div className="aspect-square overflow-hidden rounded-lg">
                 <img
-                  src={product.images[selectedImage]}
+                  src={displayImages[selectedImage]}
                   alt={product.name}
                   className="w-full h-full object-cover"
                 />
@@ -84,7 +158,7 @@ const ProductPage = () => {
               
               {/* Image Thumbnails */}
               <div className="flex space-x-2">
-                {product.images.map((image, index) => (
+                {displayImages.map((image, index) => (
                   <button
                     key={index}
                     className={`w-20 h-20 rounded-md overflow-hidden border-2 ${
@@ -121,8 +195,8 @@ const ProductPage = () => {
               
               {/* Price */}
               <div className="flex items-center">
-                <span className="text-2xl font-semibold">${product.price.toFixed(2)}</span>
-                {product.originalPrice && (
+                <span className="text-2xl font-semibold">${currentPrice.toFixed(2)}</span>
+                {product.originalPrice && !selectedVariant && (
                   <span className="text-lg line-through text-muted-foreground ml-3">
                     ${product.originalPrice.toFixed(2)}
                   </span>
@@ -149,6 +223,60 @@ const ProductPage = () => {
               {/* Description */}
               <p className="text-muted-foreground">{product.description}</p>
               
+              {/* Product Variants */}
+              {product.hasVariants && product.variants && product.variants.length > 0 && (
+                <div className="space-y-4">
+                  {getAttributeNames().map(attributeName => (
+                    <div key={attributeName} className="space-y-2">
+                      <h3 className="text-sm font-medium">Select {attributeName}</h3>
+                      
+                      {attributeName.toLowerCase() === 'color' ? (
+                        <RadioGroup 
+                          value={selectedAttributes[attributeName] || ''} 
+                          onValueChange={(value) => handleAttributeChange(attributeName, value)}
+                          className="flex gap-2"
+                        >
+                          {getAttributeValues(attributeName).map(value => (
+                            <div key={value} className="flex items-center space-x-2">
+                              <RadioGroupItem 
+                                value={value} 
+                                id={`${attributeName}-${value}`}
+                                className="sr-only peer"
+                              />
+                              <label
+                                htmlFor={`${attributeName}-${value}`}
+                                className={`w-8 h-8 rounded-full border-2 cursor-pointer flex items-center justify-center
+                                  ${selectedAttributes[attributeName] === value ? 'border-black' : 'border-gray-200'}
+                                  peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2`}
+                                style={{ backgroundColor: value.toLowerCase() }}
+                              >
+                                <span className="sr-only">{value}</span>
+                              </label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      ) : (
+                        <Select 
+                          value={selectedAttributes[attributeName] || ''} 
+                          onValueChange={(value) => handleAttributeChange(attributeName, value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={`Select ${attributeName}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAttributeValues(attributeName).map(value => (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
               {/* Materials & Specs */}
               <div className="space-y-2">
                 <div className="flex">
@@ -163,13 +291,13 @@ const ProductPage = () => {
                 )}
                 <div className="flex">
                   <span className="font-medium min-w-28">SKU:</span>
-                  <span>{product.sku}</span>
+                  <span>{selectedVariant ? selectedVariant.sku : product.sku}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium min-w-28">Availability:</span>
-                  <span className={product.stock > 0 ? "text-green-600" : "text-red-600"}>
-                    {product.stock > 0
-                      ? `In Stock (${product.stock} available)`
+                  <span className={currentStock > 0 ? "text-green-600" : "text-red-600"}>
+                    {currentStock > 0
+                      ? `In Stock (${currentStock} available)`
                       : "Out of Stock"}
                   </span>
                 </div>
@@ -190,7 +318,7 @@ const ProductPage = () => {
                   <button
                     onClick={handleIncreaseQuantity}
                     className="px-3 py-1 border-l border-border"
-                    disabled={quantity >= product.stock}
+                    disabled={quantity >= currentStock}
                   >
                     +
                   </button>
@@ -199,7 +327,7 @@ const ProductPage = () => {
               
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4">
-                <Button className="btn-primary flex-grow" disabled={product.stock <= 0}>
+                <Button className="btn-primary flex-grow" disabled={currentStock <= 0}>
                   <ShoppingBag className="mr-2 h-4 w-4" /> Add to Cart
                 </Button>
                 <Button variant="outline" className="btn-outlined">

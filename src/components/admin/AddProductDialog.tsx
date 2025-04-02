@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ProductVariantsManager, VariantAttribute, VariantOption } from "./ProductVariantsManager";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 // Define the form schema
 const productSchema = z.object({
@@ -27,8 +30,14 @@ const productSchema = z.object({
   materials: z.string(),
   dimensions: z.string().optional(),
   images: z.array(z.string()).default([]),
+  hasVariants: z.boolean().default(false),
 }).refine(
   (data) => {
+    // If has variants, we don't validate the pricing fields here
+    if (data.hasVariants) {
+      return true;
+    }
+    
     // If pricing type is flat, price must be provided
     if (data.pricingType === "flat") {
       return !!data.price && !isNaN(Number(data.price)) && Number(data.price) > 0;
@@ -51,7 +60,10 @@ const productSchema = z.object({
   }
 );
 
-export type ProductFormValues = z.infer<typeof productSchema>;
+export type ProductFormValues = z.infer<typeof productSchema> & {
+  variantAttributes?: VariantAttribute[];
+  variants?: VariantOption[];
+};
 
 interface AddProductDialogProps {
   open: boolean;
@@ -76,11 +88,17 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
       materials: "",
       dimensions: "",
       images: [],
+      hasVariants: false,
     },
   });
 
   const pricingType = form.watch("pricingType");
+  const hasVariants = form.watch("hasVariants");
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  
+  // State for variant management
+  const [variantAttributes, setVariantAttributes] = useState<VariantAttribute[]>([]);
+  const [variants, setVariants] = useState<VariantOption[]>([]);
 
   // Calculate dynamic price when inputs change
   React.useEffect(() => {
@@ -102,6 +120,9 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
     // Prepare the form values for submission
     const formattedValues = {
       ...values,
+      // Include variants data if enabled
+      variantAttributes: hasVariants ? variantAttributes : undefined,
+      variants: hasVariants ? variants : undefined,
       // In a real app, we would handle image uploads here
       images: values.images.length ? values.images : [
         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80"
@@ -109,6 +130,8 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
     };
     onSubmit(formattedValues);
     form.reset();
+    setVariantAttributes([]);
+    setVariants([]);
   }
 
   return (
@@ -138,133 +161,156 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                     </FormItem>
                   )}
                 />
-
+                
+                {/* Variants toggle */}
                 <FormField
                   control={form.control}
-                  name="pricingType"
+                  name="hasVariants"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Pricing Type</FormLabel>
+                    <FormItem className="space-y-0">
                       <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col space-y-1"
-                        >
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="flat" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Flat Rate
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="dynamic" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Dynamic (Weight Based)
-                            </FormLabel>
-                          </FormItem>
-                        </RadioGroup>
+                        <div className="hidden">
+                          <input
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={field.onChange}
+                          />
+                        </div>
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {pricingType === "flat" ? (
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Price ($)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            step="0.01" 
-                            placeholder="1299.99" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <div className="space-y-4 p-4 border border-gray-200 rounded-md">
+                {!hasVariants && (
+                  <>
                     <FormField
                       control={form.control}
-                      name="weight"
+                      name="pricingType"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Weight (grams)</FormLabel>
+                        <FormItem className="space-y-3">
+                          <FormLabel>Pricing Type</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.001" 
-                              placeholder="5.5" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="pricePerGram"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price per Gram ($)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.01" 
-                              placeholder="65.50" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="makingCharge"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Making Charge ($)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.01" 
-                              placeholder="299.99" 
-                              {...field} 
-                            />
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              className="flex flex-col space-y-1"
+                            >
+                              <FormItem className="flex items-center space-x-3 space-y-0">
+                                <FormControl>
+                                  <RadioGroupItem value="flat" />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  Flat Rate
+                                </FormLabel>
+                              </FormItem>
+                              <FormItem className="flex items-center space-x-3 space-y-0">
+                                <FormControl>
+                                  <RadioGroupItem value="dynamic" />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  Dynamic (Weight Based)
+                                </FormLabel>
+                              </FormItem>
+                            </RadioGroup>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    {calculatedPrice !== null && (
-                      <div className="text-sm font-medium mt-2 p-2 bg-muted rounded">
-                        <p>Calculated Price: <span className="text-gold">${calculatedPrice.toFixed(2)}</span></p>
-                        <p className="text-xs text-muted-foreground">
-                          ({form.getValues("weight")} g × ${form.getValues("pricePerGram")}/g) + ${form.getValues("makingCharge")} making charge
-                        </p>
+                    {pricingType === "flat" ? (
+                      <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price ($)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                step="0.01" 
+                                placeholder="1299.99" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ) : (
+                      <div className="space-y-4 p-4 border border-gray-200 rounded-md">
+                        <FormField
+                          control={form.control}
+                          name="weight"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Weight (grams)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  min="0" 
+                                  step="0.001" 
+                                  placeholder="5.5" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="pricePerGram"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Price per Gram ($)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  min="0" 
+                                  step="0.01" 
+                                  placeholder="65.50" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="makingCharge"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Making Charge ($)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  min="0" 
+                                  step="0.01" 
+                                  placeholder="299.99" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {calculatedPrice !== null && (
+                          <div className="text-sm font-medium mt-2 p-2 bg-muted rounded">
+                            <p>Calculated Price: <span className="text-gold">${calculatedPrice.toFixed(2)}</span></p>
+                            <p className="text-xs text-muted-foreground">
+                              ({form.getValues("weight")} g × ${form.getValues("pricePerGram")}/g) + ${form.getValues("makingCharge")} making charge
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
 
                 <FormField
@@ -294,6 +340,38 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                     </FormItem>
                   )}
                 />
+                
+                {!hasVariants && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" placeholder="15" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="sku"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SKU</FormLabel>
+                          <FormControl>
+                            <Input placeholder="DN-1001" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -309,34 +387,6 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                           className="resize-none min-h-[120px]"
                           {...field} 
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" placeholder="15" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="sku"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>SKU</FormLabel>
-                      <FormControl>
-                        <Input placeholder="DN-1001" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -387,6 +437,22 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                 </div>
               </div>
             </div>
+            
+            <Separator />
+            
+            {/* Product Variants Section */}
+            <Card>
+              <CardContent className="pt-6">
+                <ProductVariantsManager
+                  enabled={hasVariants}
+                  onEnabledChange={(enabled) => form.setValue("hasVariants", enabled)}
+                  attributes={variantAttributes}
+                  onAttributesChange={setVariantAttributes}
+                  variants={variants}
+                  onVariantsChange={setVariants}
+                />
+              </CardContent>
+            </Card>
 
             <DialogFooter>
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>

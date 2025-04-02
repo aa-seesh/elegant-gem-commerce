@@ -1,4 +1,15 @@
 
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  price: number;
+  stock: number;
+  attributes: {
+    [key: string]: string; // e.g., { color: "gold", size: "small" }
+  };
+  images?: string[];
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -16,6 +27,8 @@ export interface Product {
   dimensions?: string;
   rating: number;
   reviews: number;
+  hasVariants?: boolean;
+  variants?: ProductVariant[];
 }
 
 export const featuredProducts: Product[] = [
