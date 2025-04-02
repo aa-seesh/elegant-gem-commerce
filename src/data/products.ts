@@ -29,6 +29,39 @@ export interface Product {
   reviews: number;
   hasVariants?: boolean;
   variants?: ProductVariant[];
+  // Dynamic pricing fields
+  pricingType?: "flat" | "dynamic";
+  weight?: number;
+  pricePerGram?: number;
+  makingCharge?: number;
+}
+
+// New interface for product categories
+export interface ProductCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+}
+
+// New interface for product attributes
+export interface ProductAttributeValue {
+  id: string;
+  value: string;
+}
+
+export interface ProductAttribute {
+  id: string;
+  name: string;
+  values: ProductAttributeValue[];
+}
+
+// New interface for materials with pricing
+export interface Material {
+  id: string;
+  name: string;
+  pricePerGram: number;
+  lastUpdated: string; // ISO date string
 }
 
 export const featuredProducts: Product[] = [
@@ -189,10 +222,119 @@ export const featuredProducts: Product[] = [
 export const newArrivals = featuredProducts.filter(product => product.isNew);
 export const onSaleProducts = featuredProducts.filter(product => product.isSale);
 
+// Default categories for the store
+export const productCategories: ProductCategory[] = [
+  {
+    id: "cat-1",
+    name: "Necklaces",
+    slug: "necklaces",
+    description: "Elegant necklaces for every occasion"
+  },
+  {
+    id: "cat-2",
+    name: "Rings",
+    slug: "rings",
+    description: "Beautiful rings for engagements, weddings, and fashion"
+  },
+  {
+    id: "cat-3",
+    name: "Earrings",
+    slug: "earrings",
+    description: "Stunning earrings from studs to chandeliers"
+  },
+  {
+    id: "cat-4",
+    name: "Bracelets",
+    slug: "bracelets",
+    description: "Stylish bracelets for wrists and ankles"
+  },
+  {
+    id: "cat-5",
+    name: "Watches",
+    slug: "watches",
+    description: "Luxury timepieces for men and women"
+  }
+];
+
+// Default attributes for products
+export const productAttributes: ProductAttribute[] = [
+  {
+    id: "attr-1",
+    name: "Color",
+    values: [
+      { id: "color-1", value: "Gold" },
+      { id: "color-2", value: "Silver" },
+      { id: "color-3", value: "Rose Gold" },
+      { id: "color-4", value: "Platinum" }
+    ]
+  },
+  {
+    id: "attr-2",
+    name: "Size",
+    values: [
+      { id: "size-1", value: "Small" },
+      { id: "size-2", value: "Medium" },
+      { id: "size-3", value: "Large" }
+    ]
+  },
+  {
+    id: "attr-3",
+    name: "Style",
+    values: [
+      { id: "style-1", value: "Classic" },
+      { id: "style-2", value: "Modern" },
+      { id: "style-3", value: "Vintage" }
+    ]
+  }
+];
+
+// Default materials with pricing
+export const materials: Material[] = [
+  {
+    id: "mat-1",
+    name: "Gold (18K)",
+    pricePerGram: 65.50,
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    id: "mat-2",
+    name: "Silver (925)",
+    pricePerGram: 0.85,
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    id: "mat-3",
+    name: "Platinum",
+    pricePerGram: 32.75,
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    id: "mat-4",
+    name: "Rose Gold (14K)",
+    pricePerGram: 45.25,
+    lastUpdated: new Date().toISOString()
+  }
+];
+
 export const getProductById = (id: string): Product | undefined => {
   return featuredProducts.find(product => product.id === id);
 };
 
 export const getProductsByCategory = (category: string): Product[] => {
   return featuredProducts.filter(product => product.category === category);
+};
+
+// Helper function to get a category by its slug
+export const getCategoryBySlug = (slug: string): ProductCategory | undefined => {
+  return productCategories.find(category => category.slug === slug);
+};
+
+// Helper function to get an attribute by its id
+export const getAttributeById = (id: string): ProductAttribute | undefined => {
+  return productAttributes.find(attribute => attribute.id === id);
+};
+
+// Helper function to get a material by its id
+export const getMaterialById = (id: string): Material | undefined => {
+  return materials.find(material => material.id === id);
 };

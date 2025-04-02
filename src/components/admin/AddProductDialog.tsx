@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -14,6 +14,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductVariantsManager, VariantAttribute, VariantOption } from "./ProductVariantsManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { 
+  productCategories, 
+  materials,
+  productAttributes 
+} from "@/data/products";
 
 // Define the form schema
 const productSchema = z.object({
@@ -22,7 +27,7 @@ const productSchema = z.object({
   pricingType: z.enum(["flat", "dynamic"]),
   price: z.string().optional(),
   weight: z.string().optional(),
-  pricePerGram: z.string().optional(),
+  materialId: z.string().optional(),
   makingCharge: z.string().optional(),
   category: z.string().min(1, "Category is required"),
   sku: z.string().min(1, "SKU is required"),
@@ -43,11 +48,11 @@ const productSchema = z.object({
       return !!data.price && !isNaN(Number(data.price)) && Number(data.price) > 0;
     }
     
-    // If pricing type is dynamic, weight, pricePerGram, and makingCharge must be provided
+    // If pricing type is dynamic, weight, materialId, and makingCharge must be provided
     if (data.pricingType === "dynamic") {
       return (
         !!data.weight && !isNaN(Number(data.weight)) && Number(data.weight) > 0 &&
-        !!data.pricePerGram && !isNaN(Number(data.pricePerGram)) && Number(data.pricePerGram) >= 0 &&
+        !!data.materialId && 
         !!data.makingCharge && !isNaN(Number(data.makingCharge)) && Number(data.makingCharge) >= 0
       );
     }
@@ -80,7 +85,7 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
       pricingType: "flat",
       price: "",
       weight: "",
-      pricePerGram: "",
+      materialId: "",
       makingCharge: "",
       category: "",
       sku: "",
@@ -94,27 +99,46 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
 
   const pricingType = form.watch("pricingType");
   const hasVariants = form.watch("hasVariants");
+  const selectedMaterialId = form.watch("materialId");
+  const weight = form.watch("weight");
+  const makingCharge = form.watch("makingCharge");
+  
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [availableAttributes, setAvailableAttributes] = useState<VariantAttribute[]>(
+    productAttributes.map(attr => ({
+      name: attr.name,
+      values: attr.values.map(v => v.value)
+    }))
+  );
   
   // State for variant management
   const [variantAttributes, setVariantAttributes] = useState<VariantAttribute[]>([]);
   const [variants, setVariants] = useState<VariantOption[]>([]);
 
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset();
+      setVariantAttributes([]);
+      setVariants([]);
+    }
+  }, [open, form]);
+
   // Calculate dynamic price when inputs change
-  React.useEffect(() => {
+  useEffect(() => {
     if (pricingType === "dynamic") {
-      const weight = Number(form.getValues("weight"));
-      const pricePerGram = Number(form.getValues("pricePerGram"));
-      const makingCharge = Number(form.getValues("makingCharge"));
+      const weightValue = parseFloat(weight || "0");
+      const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
+      const makingChargeValue = parseFloat(makingCharge || "0");
       
-      if (weight > 0 && pricePerGram >= 0 && makingCharge >= 0) {
-        const totalPrice = (weight * pricePerGram) + makingCharge;
+      if (weightValue > 0 && selectedMaterial && makingChargeValue >= 0) {
+        const totalPrice = (weightValue * selectedMaterial.pricePerGram) + makingChargeValue;
         setCalculatedPrice(totalPrice);
       } else {
         setCalculatedPrice(null);
       }
     }
-  }, [pricingType, form.watch("weight"), form.watch("pricePerGram"), form.watch("makingCharge"), form]);
+  }, [pricingType, weight, selectedMaterialId, makingCharge]);
 
   function handleSubmit(values: ProductFormValues) {
     // Prepare the form values for submission
@@ -132,6 +156,7 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
     form.reset();
     setVariantAttributes([]);
     setVariants([]);
+    onOpenChange(false);
   }
 
   return (
@@ -181,43 +206,44 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                   )}
                 />
 
-                {!hasVariants && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="pricingType"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Pricing Type</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex flex-col space-y-1"
-                            >
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="flat" />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                  Flat Rate
-                                </FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="dynamic" />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                  Dynamic (Weight Based)
-                                </FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                {/* Show pricing options for main product or variants */}
+                <FormField
+                  control={form.control}
+                  name="pricingType"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Pricing Type</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="flat" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Flat Rate
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="dynamic" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Dynamic (Weight Based)
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
+                {!hasVariants ? (
+                  <>
                     {pricingType === "flat" ? (
                       <FormField
                         control={form.control}
@@ -262,19 +288,27 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                         
                         <FormField
                           control={form.control}
-                          name="pricePerGram"
+                          name="materialId"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Price per Gram ($)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  min="0" 
-                                  step="0.01" 
-                                  placeholder="65.50" 
-                                  {...field} 
-                                />
-                              </FormControl>
+                              <FormLabel>Material</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a material" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {materials.map(material => (
+                                    <SelectItem key={material.id} value={material.id}>
+                                      {material.name} (${material.pricePerGram.toFixed(2)}/g)
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -303,14 +337,22 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                         {calculatedPrice !== null && (
                           <div className="text-sm font-medium mt-2 p-2 bg-muted rounded">
                             <p>Calculated Price: <span className="text-gold">${calculatedPrice.toFixed(2)}</span></p>
-                            <p className="text-xs text-muted-foreground">
-                              ({form.getValues("weight")} g × ${form.getValues("pricePerGram")}/g) + ${form.getValues("makingCharge")} making charge
-                            </p>
+                            {selectedMaterialId && (
+                              <p className="text-xs text-muted-foreground">
+                                ({weight || 0} g × ${materials.find(m => m.id === selectedMaterialId)?.pricePerGram.toFixed(2) || 0}/g) + ${makingCharge || 0} making charge
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
                     )}
                   </>
+                ) : (
+                  <div className="p-4 border border-gray-200 rounded-md">
+                    <p className="text-sm text-muted-foreground">
+                      Pricing will be set individually for each variant
+                    </p>
+                  </div>
                 )}
 
                 <FormField
@@ -329,11 +371,11 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="necklaces">Necklaces</SelectItem>
-                          <SelectItem value="rings">Rings</SelectItem>
-                          <SelectItem value="earrings">Earrings</SelectItem>
-                          <SelectItem value="bracelets">Bracelets</SelectItem>
-                          <SelectItem value="watches">Watches</SelectItem>
+                          {productCategories.map(category => (
+                            <SelectItem key={category.id} value={category.slug}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -450,6 +492,9 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
                   onAttributesChange={setVariantAttributes}
                   variants={variants}
                   onVariantsChange={setVariants}
+                  availableAttributes={availableAttributes}
+                  showDynamicPricing={true}
+                  materials={materials}
                 />
               </CardContent>
             </Card>

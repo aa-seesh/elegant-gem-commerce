@@ -19,6 +19,7 @@ import {
   Users,
   BarChart2,
   ImagePlus,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,10 @@ const AdminProducts = () => {
             <ShoppingBag className="mr-3 h-5 w-5" />
             Products
           </Link>
+          <Link to="/admin/product-settings" className="hover:bg-muted p-3 rounded-md flex items-center">
+            <Layers className="mr-3 h-5 w-5" />
+            Product Settings
+          </Link>
           <Link to="/admin/orders" className="hover:bg-muted p-3 rounded-md flex items-center">
             <Package className="mr-3 h-5 w-5" />
             Orders
@@ -177,12 +182,19 @@ const AdminProducts = () => {
               <p className="text-muted-foreground">Manage your product inventory</p>
             </div>
             
-            <Button 
-              className="bg-gold hover:bg-gold-dark"
-              onClick={() => setIsAddProductOpen(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add Product
-            </Button>
+            <div className="flex gap-2">
+              <Link to="/admin/product-settings">
+                <Button variant="outline">
+                  <Layers className="mr-2 h-4 w-4" /> Settings
+                </Button>
+              </Link>
+              <Button 
+                className="bg-gold hover:bg-gold-dark"
+                onClick={() => setIsAddProductOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add Product
+              </Button>
+            </div>
           </div>
           
           {/* Search and filters for mobile */}

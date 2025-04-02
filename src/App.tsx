@@ -16,6 +16,7 @@ import AdminCustomers from "./pages/AdminCustomers";
 import AdminDiscounts from "./pages/AdminDiscounts";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminSettings from "./pages/AdminSettings";
+import AdminProductSettings from "./pages/AdminProductSettings";
 
 const App = () => {
   // Create a new QueryClient for each component instance
@@ -34,6 +35,7 @@ const App = () => {
             <Route path="/product/:id" element={<ProductPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/product-settings" element={<AdminProductSettings />} />
             <Route path="/admin/orders" element={<AdminOrders />} />
             <Route path="/admin/customers" element={<AdminCustomers />} />
             <Route path="/admin/discounts" element={<AdminDiscounts />} />
