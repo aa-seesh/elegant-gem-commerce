@@ -19,6 +19,7 @@ import {
   materials,
   productAttributes 
 } from "@/data/products";
+import { useToast } from "@/components/ui/use-toast";
 
 // Define the form schema
 const productSchema = z.object({
@@ -77,6 +78,7 @@ interface AddProductDialogProps {
 }
 
 export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDialogProps) {
+  const { toast } = useToast();
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -140,7 +142,78 @@ export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDia
     }
   }, [pricingType, weight, selectedMaterialId, makingCharge]);
 
+  // Validate variants before submission
+  const validateVariants = () => {
+    if (!hasVariants || variants.length === 0) return true;
+
+    // Check if all variants have required fields
+    for (const variant of variants) {
+      if (variant.pricingType === "flat") {
+        if (!variant.price || isNaN(Number(variant.price)) || Number(variant.price) <= 0) {
+          toast({
+            title: "Validation error",
+            description: `Please set a valid price for all variants`,
+            variant: "destructive"
+          });
+          return false;
+        }
+      } else if (variant.pricingType === "dynamic") {
+        if (!variant.weight || isNaN(Number(variant.weight)) || Number(variant.weight) <= 0) {
+          toast({
+            title: "Validation error",
+            description: `Please set a valid weight for all variants`,
+            variant: "destructive"
+          });
+          return false;
+        }
+        
+        if (!variant.materialId) {
+          toast({
+            title: "Validation error",
+            description: `Please select a material for all variants`,
+            variant: "destructive"
+          });
+          return false;
+        }
+        
+        if (!variant.makingCharge || isNaN(Number(variant.makingCharge)) || Number(variant.makingCharge) < 0) {
+          toast({
+            title: "Validation error",
+            description: `Please set a valid making charge for all variants`,
+            variant: "destructive"
+          });
+          return false;
+        }
+      }
+      
+      if (!variant.sku) {
+        toast({
+          title: "Validation error",
+          description: `Please set an SKU for all variants`,
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      if (!variant.stock || isNaN(Number(variant.stock)) || Number(variant.stock) < 0) {
+        toast({
+          title: "Validation error",
+          description: `Please set a valid stock quantity for all variants`,
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   function handleSubmit(values: ProductFormValues) {
+    // If we have variants but variant validation fails, stop submission
+    if (hasVariants && !validateVariants()) {
+      return;
+    }
+    
     // Prepare the form values for submission
     const formattedValues = {
       ...values,

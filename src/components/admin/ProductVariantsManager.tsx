@@ -237,7 +237,7 @@ export const ProductVariantsManager: React.FC<ProductVariantsManagerProps> = ({
     
     // Calculate dynamic price if applicable
     if (showDynamicPricing && 
-        field === "weight" || field === "materialId" || field === "makingCharge") {
+        (field === "weight" || field === "materialId" || field === "makingCharge")) {
       const variant = updatedVariants[index];
       if (variant.pricingType === "dynamic") {
         const weight = parseFloat(variant.weight || "0");

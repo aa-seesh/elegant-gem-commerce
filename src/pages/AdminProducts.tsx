@@ -79,10 +79,21 @@ const AdminProducts = () => {
 
   // Add product handler
   const handleAddProduct = (productData) => {
-    toast({
-      title: "Product added",
-      description: "The product has been successfully added",
-    });
+    console.log("New product data:", productData);
+    
+    // Check if this is a variable product
+    if (productData.hasVariants && productData.variants && productData.variants.length > 0) {
+      toast({
+        title: "Variable product added",
+        description: `Product "${productData.name}" with ${productData.variants.length} variants added successfully`,
+      });
+    } else {
+      toast({
+        title: "Product added",
+        description: "The product has been successfully added",
+      });
+    }
+    
     setIsAddProductOpen(false);
     // In a real app, you would add the product to the database
   };
@@ -287,11 +298,23 @@ const AdminProducts = () => {
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <span className="line-clamp-2">{product.name}</span>
+                          <div>
+                            <span className="line-clamp-2">{product.name}</span>
+                            {product.hasVariants && product.variants && product.variants.length > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                {product.variants.length} variants
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>{product.category}</TableCell>
-                      <TableCell>${product.price.toFixed(2)}</TableCell>
+                      <TableCell>
+                        {product.hasVariants && product.variants
+                          ? `$${product.variants[0].price} - $${product.variants[product.variants.length-1].price}`
+                          : `$${product.price.toFixed(2)}`
+                        }
+                      </TableCell>
                       <TableCell>{Math.floor(Math.random() * 100) + 1}</TableCell>
                       <TableCell>
                         <div className="flex gap-2 items-center">
