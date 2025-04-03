@@ -18,11 +18,38 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-beige-light">
       <Navbar />
       <main className="flex-grow">
         {/* Hero Banner */}
         <HeroBanner />
+        
+        {/* Welcome Message */}
+        <motion.div 
+          className="container mx-auto px-4 py-12 text-center"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+        >
+          <motion.div 
+            className="max-w-3xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            <h2 className="text-3xl md:text-4xl font-serif font-bold mb-4">Welcome to Luxe Jewelry</h2>
+            <p className="text-muted-foreground mb-6">
+              Discover our carefully curated collection of fine jewelry pieces, expertly crafted with attention
+              to detail and a passion for timeless elegance. Each piece tells a unique story and is designed
+              to be cherished for generations.
+            </p>
+            <div className="flex justify-center">
+              <div className="w-16 h-1 bg-gold rounded-full"></div>
+            </div>
+          </motion.div>
+        </motion.div>
         
         {/* Categories */}
         <SlideUp delay={0.2}>

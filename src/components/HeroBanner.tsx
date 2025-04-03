@@ -19,6 +19,9 @@ const HeroBanner = () => {
           src="https://images.unsplash.com/photo-1617038260897-43a7195d1de1?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
           alt="Luxury jewelry collection"
           className="w-full h-full object-cover object-center"
+          onError={(e) => {
+            e.currentTarget.src = "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952?ixlib=rb-4.0.3&auto=format&fit=crop&w=5304&q=80";
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent"></div>
       </motion.div>
@@ -38,7 +41,7 @@ const HeroBanner = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
             >
-              New Collection 2023
+              New Collection 2025
             </motion.h4>
             
             <motion.h1 
