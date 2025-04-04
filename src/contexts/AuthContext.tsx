@@ -48,10 +48,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { error, data } = await supabase.auth.signInWithPassword({ 
         email, 
         password,
-        options: {
-          // Ensure redirect works for hosted environments
-          redirectTo: window.location.origin
-        }
       });
       
       if (error) throw error;
@@ -78,8 +74,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             first_name: firstName,
             last_name: lastName
           },
-          // Ensure redirect works for hosted environments
-          redirectTo: window.location.origin
+          emailRedirectTo: window.location.origin
         }
       });
       
