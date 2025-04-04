@@ -1,17 +1,42 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SignInForm from "@/components/SignInForm";
 import SignUpForm from "@/components/SignUpForm";
+import { useAuth } from "@/contexts/AuthContext";
+import { makeUserAdmin } from "@/services/userService";
+import { useToast } from "@/components/ui/use-toast";
 
 const AuthPage: React.FC = () => {
   const [isSignIn, setIsSignIn] = useState(true);
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleAuthSuccess = () => {
+  // Redirect authenticated users
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
+  const handleAuthSuccess = async (isNewUser: boolean = false) => {
+    // If it's a new user, try to make them an admin (first user in the system)
+    if (isNewUser && user) {
+      try {
+        await makeUserAdmin(user.id);
+        toast({
+          title: "Admin role granted",
+          description: "You have been granted admin privileges as the first user.",
+        });
+      } catch (error) {
+        console.error("Error making user admin:", error);
+      }
+    }
+    
     navigate('/');
   };
 
@@ -69,9 +94,9 @@ const AuthPage: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             {isSignIn ? (
-              <SignInForm onSuccess={handleAuthSuccess} onSwitch={toggleForm} />
+              <SignInForm onSuccess={() => handleAuthSuccess(false)} onSwitch={toggleForm} />
             ) : (
-              <SignUpForm onSuccess={handleAuthSuccess} onSwitch={toggleForm} />
+              <SignUpForm onSuccess={() => handleAuthSuccess(true)} onSwitch={toggleForm} />
             )}
           </motion.div>
         </div>

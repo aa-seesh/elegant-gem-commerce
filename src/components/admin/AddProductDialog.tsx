@@ -1,588 +1,415 @@
 
 import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { ImagePlus } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ProductVariantsManager, VariantAttribute, VariantOption } from "./ProductVariantsManager";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { 
-  productCategories, 
-  materials,
-  productAttributes 
-} from "@/data/products";
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-
-// Define the form schema
-const productSchema = z.object({
-  name: z.string().min(2, "Product name is required"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
-  pricingType: z.enum(["flat", "dynamic"]),
-  price: z.string().optional(),
-  weight: z.string().optional(),
-  materialId: z.string().optional(),
-  makingCharge: z.string().optional(),
-  category: z.string().min(1, "Category is required"),
-  sku: z.string().min(1, "SKU is required"),
-  stock: z.string().refine(val => !isNaN(Number(val)) && Number(val) >= 0, "Stock must be a non-negative number"),
-  materials: z.string(),
-  dimensions: z.string().optional(),
-  images: z.array(z.string()).default([]),
-  hasVariants: z.boolean().default(false),
-}).refine(
-  (data) => {
-    // If has variants, we don't validate the pricing fields here
-    if (data.hasVariants) {
-      return true;
-    }
-    
-    // If pricing type is flat, price must be provided
-    if (data.pricingType === "flat") {
-      return !!data.price && !isNaN(Number(data.price)) && Number(data.price) > 0;
-    }
-    
-    // If pricing type is dynamic, weight, materialId, and makingCharge must be provided
-    if (data.pricingType === "dynamic") {
-      return (
-        !!data.weight && !isNaN(Number(data.weight)) && Number(data.weight) > 0 &&
-        !!data.materialId && 
-        !!data.makingCharge && !isNaN(Number(data.makingCharge)) && Number(data.makingCharge) >= 0
-      );
-    }
-    
-    return false;
-  },
-  {
-    message: "Please provide valid pricing information",
-    path: ["pricingType"],
-  }
-);
-
-export type ProductFormValues = z.infer<typeof productSchema> & {
-  variantAttributes?: VariantAttribute[];
-  variants?: VariantOption[];
-};
+import { Loader2, ImagePlus, X } from "lucide-react";
+import { createProduct, updateProduct, ProductInput, addProductImage } from "@/services/productService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AddProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: ProductFormValues) => void;
+  product?: any;
+  categories: any[];
+  onSave: (product: any) => void;
 }
 
-export function AddProductDialog({ open, onOpenChange, onSubmit }: AddProductDialogProps) {
+export const AddProductDialog: React.FC<AddProductDialogProps> = ({ 
+  open, 
+  onOpenChange, 
+  product, 
+  categories, 
+  onSave 
+}) => {
+  const [formData, setFormData] = useState<ProductInput>({
+    name: "",
+    description: "",
+    price: 0,
+    category_id: "",
+    slug: "",
+    in_stock: true,
+    featured: false
+  });
+  const [loading, setLoading] = useState(false);
+  const [images, setImages] = useState<File[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [imageUploading, setImageUploading] = useState(false);
   const { toast } = useToast();
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues: {
+
+  useEffect(() => {
+    if (product) {
+      const { id, created_at, product_images, ...productData } = product;
+      setFormData(productData);
+      
+      // Set existing image URLs
+      if (product_images && product_images.length > 0) {
+        setImageUrls(product_images.map(img => img.image_url));
+      } else {
+        setImageUrls([]);
+      }
+    } else {
+      resetForm();
+    }
+  }, [product, open]);
+
+  const resetForm = () => {
+    setFormData({
       name: "",
       description: "",
-      pricingType: "flat",
-      price: "",
-      weight: "",
-      materialId: "",
-      makingCharge: "",
-      category: "",
-      sku: "",
-      stock: "",
-      materials: "",
-      dimensions: "",
-      images: [],
-      hasVariants: false,
-    },
-  });
-
-  const pricingType = form.watch("pricingType");
-  const hasVariants = form.watch("hasVariants");
-  const selectedMaterialId = form.watch("materialId");
-  const weight = form.watch("weight");
-  const makingCharge = form.watch("makingCharge");
-  
-  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
-  const [availableAttributes, setAvailableAttributes] = useState<VariantAttribute[]>(
-    productAttributes.map(attr => ({
-      name: attr.name,
-      values: attr.values.map(v => v.value)
-    }))
-  );
-  
-  // State for variant management
-  const [variantAttributes, setVariantAttributes] = useState<VariantAttribute[]>([]);
-  const [variants, setVariants] = useState<VariantOption[]>([]);
-
-  // Reset form when dialog opens
-  useEffect(() => {
-    if (open) {
-      form.reset();
-      setVariantAttributes([]);
-      setVariants([]);
-    }
-  }, [open, form]);
-
-  // Calculate dynamic price when inputs change
-  useEffect(() => {
-    if (pricingType === "dynamic") {
-      const weightValue = parseFloat(weight || "0");
-      const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
-      const makingChargeValue = parseFloat(makingCharge || "0");
-      
-      if (weightValue > 0 && selectedMaterial && makingChargeValue >= 0) {
-        const totalPrice = (weightValue * selectedMaterial.pricePerGram) + makingChargeValue;
-        setCalculatedPrice(totalPrice);
-      } else {
-        setCalculatedPrice(null);
-      }
-    }
-  }, [pricingType, weight, selectedMaterialId, makingCharge]);
-
-  // Validate variants before submission
-  const validateVariants = () => {
-    if (!hasVariants || variants.length === 0) return true;
-
-    // Check if all variants have required fields
-    for (const variant of variants) {
-      if (variant.pricingType === "flat") {
-        if (!variant.price || isNaN(Number(variant.price)) || Number(variant.price) <= 0) {
-          toast({
-            title: "Validation error",
-            description: `Please set a valid price for all variants`,
-            variant: "destructive"
-          });
-          return false;
-        }
-      } else if (variant.pricingType === "dynamic") {
-        if (!variant.weight || isNaN(Number(variant.weight)) || Number(variant.weight) <= 0) {
-          toast({
-            title: "Validation error",
-            description: `Please set a valid weight for all variants`,
-            variant: "destructive"
-          });
-          return false;
-        }
-        
-        if (!variant.materialId) {
-          toast({
-            title: "Validation error",
-            description: `Please select a material for all variants`,
-            variant: "destructive"
-          });
-          return false;
-        }
-        
-        if (!variant.makingCharge || isNaN(Number(variant.makingCharge)) || Number(variant.makingCharge) < 0) {
-          toast({
-            title: "Validation error",
-            description: `Please set a valid making charge for all variants`,
-            variant: "destructive"
-          });
-          return false;
-        }
-      }
-      
-      if (!variant.sku) {
-        toast({
-          title: "Validation error",
-          description: `Please set an SKU for all variants`,
-          variant: "destructive"
-        });
-        return false;
-      }
-      
-      if (!variant.stock || isNaN(Number(variant.stock)) || Number(variant.stock) < 0) {
-        toast({
-          title: "Validation error",
-          description: `Please set a valid stock quantity for all variants`,
-          variant: "destructive"
-        });
-        return false;
-      }
-    }
-
-    return true;
+      price: 0,
+      category_id: "",
+      slug: "",
+      in_stock: true,
+      featured: false
+    });
+    setImages([]);
+    setImageUrls([]);
   };
 
-  function handleSubmit(values: ProductFormValues) {
-    // If we have variants but variant validation fails, stop submission
-    if (hasVariants && !validateVariants()) {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    
+    // Auto-generate slug from name
+    if (name === "name") {
+      setFormData({
+        ...formData,
+        name: value,
+        slug: value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      });
+    }
+  };
+
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setFormData({ ...formData, [name]: checked });
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleNumberChange = (name: string, value: string) => {
+    const numValue = value === "" ? 0 : parseFloat(value);
+    setFormData({ ...formData, [name]: numValue });
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      setImages([...images, ...selectedFiles]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (productId: string) => {
+    if (images.length === 0) return [];
+    
+    setImageUploading(true);
+    const uploadedUrls = [];
+    
+    try {
+      for (const [index, image] of images.entries()) {
+        const fileName = `${Date.now()}-${index}-${image.name.replace(/\s+/g, '-')}`;
+        const filePath = `products/${productId}/${fileName}`;
+        
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('products')
+          .upload(filePath, image);
+        
+        if (uploadError) throw uploadError;
+        
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('products')
+          .getPublicUrl(filePath);
+        
+        if (urlData) {
+          // Save to product_images table
+          await addProductImage(productId, urlData.publicUrl, index);
+          uploadedUrls.push(urlData.publicUrl);
+        }
+      }
+      
+      return uploadedUrls;
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      toast({
+        title: "Error uploading images",
+        description: "There was a problem uploading one or more images",
+        variant: "destructive"
+      });
+      return [];
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.category_id || formData.price <= 0) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
       return;
     }
     
-    // Prepare the form values for submission
-    const formattedValues = {
-      ...values,
-      // Include variants data if enabled
-      variantAttributes: hasVariants ? variantAttributes : undefined,
-      variants: hasVariants ? variants : undefined,
-      // In a real app, we would handle image uploads here
-      images: values.images.length ? values.images : [
-        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=687&q=80"
-      ],
-    };
-    onSubmit(formattedValues);
-    form.reset();
-    setVariantAttributes([]);
-    setVariants([]);
-    onOpenChange(false);
-  }
+    try {
+      setLoading(true);
+      
+      let savedProduct;
+      if (product) {
+        // Update existing product
+        savedProduct = await updateProduct(product.id, formData);
+      } else {
+        // Create new product
+        savedProduct = await createProduct(formData);
+      }
+      
+      // Upload images if any
+      if (images.length > 0) {
+        await uploadImages(savedProduct.id);
+      }
+      
+      toast({
+        title: product ? "Product updated" : "Product created",
+        description: `${formData.name} has been ${product ? "updated" : "created"} successfully`
+      });
+      
+      onSave(savedProduct);
+      resetForm();
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: "Error saving product",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Product</DialogTitle>
-          <DialogDescription>
-            Fill in the details below to add a new product to your inventory.
-          </DialogDescription>
+          <DialogTitle>
+            {product ? `Edit Product: ${product.name}` : "Add New Product"}
+          </DialogTitle>
         </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
+        
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Product Name *</Label>
+                <Input
+                  id="name"
                   name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Diamond Enchantment Necklace" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
                 />
-                
-                {/* Variants toggle */}
-                <FormField
-                  control={form.control}
-                  name="hasVariants"
-                  render={({ field }) => (
-                    <FormItem className="space-y-0">
-                      <FormControl>
-                        <div className="hidden">
-                          <input
-                            type="checkbox"
-                            checked={field.value}
-                            onChange={field.onChange}
-                          />
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {/* Show pricing options for main product or variants */}
-                <FormField
-                  control={form.control}
-                  name="pricingType"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Pricing Type</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col space-y-1"
-                        >
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="flat" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Flat Rate
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="dynamic" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Dynamic (Weight Based)
-                            </FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {!hasVariants ? (
-                  <>
-                    {pricingType === "flat" ? (
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Price ($)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                step="0.01" 
-                                placeholder="1299.99" 
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ) : (
-                      <div className="space-y-4 p-4 border border-gray-200 rounded-md">
-                        <FormField
-                          control={form.control}
-                          name="weight"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Weight (grams)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  min="0" 
-                                  step="0.001" 
-                                  placeholder="5.5" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="materialId"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Material</FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select a material" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {materials.map(material => (
-                                    <SelectItem key={material.id} value={material.id}>
-                                      {material.name} (${material.pricePerGram.toFixed(2)}/g)
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="makingCharge"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Making Charge ($)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  min="0" 
-                                  step="0.01" 
-                                  placeholder="299.99" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        {calculatedPrice !== null && (
-                          <div className="text-sm font-medium mt-2 p-2 bg-muted rounded">
-                            <p>Calculated Price: <span className="text-gold">${calculatedPrice.toFixed(2)}</span></p>
-                            {selectedMaterialId && (
-                              <p className="text-xs text-muted-foreground">
-                                ({weight || 0} g × ${materials.find(m => m.id === selectedMaterialId)?.pricePerGram.toFixed(2) || 0}/g) + ${makingCharge || 0} making charge
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-4 border border-gray-200 rounded-md">
-                    <p className="text-sm text-muted-foreground">
-                      Pricing will be set individually for each variant
-                    </p>
-                  </div>
-                )}
-
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {productCategories.map(category => (
-                            <SelectItem key={category.id} value={category.slug}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                {!hasVariants && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stock</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="0" placeholder="15" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="sku"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>SKU</FormLabel>
-                          <FormControl>
-                            <Input placeholder="DN-1001" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
               </div>
-
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="A stunning 18K gold necklace with a perfect diamond pendant..." 
-                          className="resize-none min-h-[120px]"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              
+              <div>
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  name="slug"
+                  value={formData.slug}
+                  onChange={handleInputChange}
+                  required
                 />
-
-                <FormField
-                  control={form.control}
-                  name="materials"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Materials</FormLabel>
-                      <FormControl>
-                        <Input placeholder="18K Gold, Diamond" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Separate materials with commas
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="dimensions"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Dimensions (optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Chain: 18 inches, Pendant: 0.5 inches" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              </div>
+              
+              <div>
+                <Label htmlFor="category_id">Category *</Label>
+                <Select
+                  value={formData.category_id}
+                  onValueChange={(value) => handleSelectChange("category_id", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="price">Price *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2">$</span>
+                    <Input
+                      id="price"
+                      name="price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => handleNumberChange("price", e.target.value)}
+                      className="pl-7"
+                      required
+                    />
+                  </div>
+                </div>
                 
-                {/* Image upload placeholder - in a real app, you would implement file uploads */}
-                <div className="border-2 border-dashed border-gray-300 rounded-md p-6 flex flex-col items-center justify-center">
-                  <ImagePlus className="h-10 w-10 text-gray-400 mb-2" />
-                  <p className="text-sm font-medium">Upload product images</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Drag & drop or click to browse files
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-4">
-                    Select Files
-                  </Button>
+                <div>
+                  <Label htmlFor="sale_price">Sale Price</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2">$</span>
+                    <Input
+                      id="sale_price"
+                      name="sale_price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.sale_price || ""}
+                      onChange={(e) => handleNumberChange("sale_price", e.target.value)}
+                      className="pl-7"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-between">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="in_stock"
+                    checked={formData.in_stock}
+                    onCheckedChange={(checked) => handleSwitchChange("in_stock", checked)}
+                  />
+                  <Label htmlFor="in_stock">In Stock</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="featured"
+                    checked={formData.featured}
+                    onCheckedChange={(checked) => handleSwitchChange("featured", checked)}
+                  />
+                  <Label htmlFor="featured">Featured</Label>
                 </div>
               </div>
             </div>
             
-            <Separator />
-            
-            {/* Product Variants Section */}
-            <Card>
-              <CardContent className="pt-6">
-                <ProductVariantsManager
-                  enabled={hasVariants}
-                  onEnabledChange={(enabled) => form.setValue("hasVariants", enabled)}
-                  attributes={variantAttributes}
-                  onAttributesChange={setVariantAttributes}
-                  variants={variants}
-                  onVariantsChange={setVariants}
-                  availableAttributes={availableAttributes}
-                  showDynamicPricing={true}
-                  materials={materials}
+            {/* Description and Images */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={5}
                 />
-              </CardContent>
-            </Card>
-
-            <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button className="bg-gold hover:bg-gold-dark" type="submit">
-                Add Product
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              </div>
+              
+              <div>
+                <Label>Product Images</Label>
+                
+                {/* Current Images */}
+                {imageUrls.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {imageUrls.map((url, index) => (
+                      <div key={index} className="relative aspect-square rounded-md overflow-hidden">
+                        <img src={url} alt="Product" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Image Upload Preview */}
+                {images.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {images.map((image, index) => (
+                      <div key={index} className="relative aspect-square rounded-md overflow-hidden">
+                        <img src={URL.createObjectURL(image)} alt="Preview" className="w-full h-full object-cover" />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-5 w-5 rounded-full"
+                          onClick={() => removeImage(index)}
+                          type="button"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Image Upload Input */}
+                <div className="mt-2">
+                  <Label
+                    htmlFor="images"
+                    className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20 rounded-md py-4 hover:border-muted-foreground/40 transition-colors"
+                  >
+                    <ImagePlus className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-sm text-muted-foreground">Click to upload images</span>
+                  </Label>
+                  <Input
+                    id="images"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              className="bg-gold hover:bg-gold-dark"
+              disabled={loading || imageUploading}
+            >
+              {(loading || imageUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Saving..." : imageUploading ? "Uploading Images..." : "Save Product"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
-}
+};

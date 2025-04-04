@@ -1,11 +1,12 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Plus, 
   Pencil, 
   Trash2, 
   Save,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,20 +21,48 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { productCategories, ProductCategory } from "@/data/products";
 import { useToast } from "@/components/ui/use-toast";
+import { 
+  fetchCategories, 
+  createCategory, 
+  updateCategory, 
+  deleteCategory,
+  CategoryInput 
+} from "@/services/categoryService";
 
 export const CategoriesManager: React.FC = () => {
-  const [categories, setCategories] = useState<ProductCategory[]>(productCategories);
+  const [categories, setCategories] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newCategory, setNewCategory] = useState<Partial<ProductCategory>>({
+  const [newCategory, setNewCategory] = useState<Partial<CategoryInput>>({
     name: "",
     slug: "",
     description: ""
   });
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleAddCategory = () => {
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchCategories();
+      setCategories(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error loading categories",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
     if (!newCategory.name || !newCategory.slug) {
       toast({
         title: "Missing information",
@@ -53,27 +82,32 @@ export const CategoriesManager: React.FC = () => {
       return;
     }
 
-    const category: ProductCategory = {
-      id: `cat-${Date.now()}`,
-      name: newCategory.name,
-      slug: newCategory.slug,
-      description: newCategory.description || ""
-    };
-
-    setCategories([...categories, category]);
-    setNewCategory({ name: "", slug: "", description: "" });
-    
-    toast({
-      title: "Category added",
-      description: `${category.name} has been added successfully`
-    });
+    try {
+      setSavingId("new");
+      const addedCategory = await createCategory(newCategory as CategoryInput);
+      setCategories([...categories, addedCategory]);
+      setNewCategory({ name: "", slug: "", description: "" });
+      
+      toast({
+        title: "Category added",
+        description: `${addedCategory.name} has been added successfully`
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error adding category",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const handleEditCategory = (category: ProductCategory) => {
+  const handleEditCategory = (category: any) => {
     setEditingId(category.id);
   };
 
-  const handleUpdateCategory = (id: string, updates: Partial<ProductCategory>) => {
+  const handleUpdateCategoryLocal = (id: string, updates: Partial<CategoryInput>) => {
     setCategories(
       categories.map(category => 
         category.id === id 
@@ -83,24 +117,55 @@ export const CategoriesManager: React.FC = () => {
     );
   };
 
-  const handleSaveEdit = (id: string) => {
-    setEditingId(null);
-    toast({
-      title: "Category updated",
-      description: "The category has been updated successfully"
-    });
+  const handleSaveEdit = async (id: string) => {
+    try {
+      const categoryToUpdate = categories.find(cat => cat.id === id);
+      if (!categoryToUpdate) return;
+
+      setSavingId(id);
+      const { name, slug, description } = categoryToUpdate;
+      const updatedCategory = await updateCategory(id, { name, slug, description });
+      
+      setEditingId(null);
+      toast({
+        title: "Category updated",
+        description: "The category has been updated successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error updating category",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSavingId(null);
+    }
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    // Reload categories to revert any unsaved changes
+    loadCategories();
   };
 
-  const handleDeleteCategory = (id: string) => {
-    setCategories(categories.filter(category => category.id !== id));
-    toast({
-      title: "Category deleted",
-      description: "The category has been deleted successfully"
-    });
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      setSavingId(id);
+      await deleteCategory(id);
+      setCategories(categories.filter(category => category.id !== id));
+      toast({
+        title: "Category deleted",
+        description: "The category has been deleted successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting category",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSavingId(null);
+    }
   };
 
   // Auto-generate slug from name
@@ -152,86 +217,126 @@ export const CategoriesManager: React.FC = () => {
                 />
               </div>
             </div>
-            <Button onClick={handleAddCategory} className="bg-gold hover:bg-gold-dark">
-              <Plus className="mr-2 h-4 w-4" /> Add Category
+            <Button 
+              onClick={handleAddCategory} 
+              className="bg-gold hover:bg-gold-dark"
+              disabled={savingId === "new"}
+            >
+              {savingId === "new" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" /> Add Category
+                </>
+              )}
             </Button>
           </div>
 
           {/* Categories list */}
           <div>
             <h3 className="text-sm font-medium mb-4">Existing Categories</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {categories.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell>
-                      {editingId === category.id ? (
-                        <Input
-                          value={category.name}
-                          onChange={(e) => handleUpdateCategory(category.id, { name: e.target.value })}
-                        />
-                      ) : (
-                        category.name
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === category.id ? (
-                        <Input
-                          value={category.slug}
-                          onChange={(e) => handleUpdateCategory(category.id, { slug: e.target.value })}
-                        />
-                      ) : (
-                        <Badge variant="outline">{category.slug}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="max-w-[300px] truncate">
-                      {editingId === category.id ? (
-                        <Textarea
-                          value={category.description}
-                          onChange={(e) => handleUpdateCategory(category.id, { description: e.target.value })}
-                          rows={2}
-                        />
-                      ) : (
-                        category.description
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === category.id ? (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleSaveEdit(category.id)}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditCategory(category)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleDeleteCategory(category.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-gold" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Slug</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {categories.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        No categories found. Add your first category above.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    categories.map((category) => (
+                      <TableRow key={category.id}>
+                        <TableCell>
+                          {editingId === category.id ? (
+                            <Input
+                              value={category.name}
+                              onChange={(e) => handleUpdateCategoryLocal(category.id, { name: e.target.value })}
+                            />
+                          ) : (
+                            category.name
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingId === category.id ? (
+                            <Input
+                              value={category.slug}
+                              onChange={(e) => handleUpdateCategoryLocal(category.id, { slug: e.target.value })}
+                            />
+                          ) : (
+                            <Badge variant="outline">{category.slug}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[300px] truncate">
+                          {editingId === category.id ? (
+                            <Textarea
+                              value={category.description || ""}
+                              onChange={(e) => handleUpdateCategoryLocal(category.id, { description: e.target.value })}
+                              rows={2}
+                            />
+                          ) : (
+                            category.description
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {editingId === category.id ? (
+                            <div className="flex justify-end gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSaveEdit(category.id)}
+                                disabled={savingId === category.id}
+                              >
+                                {savingId === category.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Save className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditCategory(category)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDeleteCategory(category.id)}
+                                disabled={savingId === category.id}
+                              >
+                                {savingId === category.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
       </CardContent>
