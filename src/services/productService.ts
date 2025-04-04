@@ -19,19 +19,18 @@ export interface ProductInput {
   pricing_model?: Database["public"]["Enums"]["pricing_model"];
 }
 
-// Completely restructured to avoid deep type instantiation issues
 export const fetchProducts = async (filters?: Record<string, any>) => {
   try {
-    // Fetch all products
+    // Step 1: Fetch all products with a basic query
     const { data: productsData, error: productsError } = await supabase
       .from("products")
       .select('*');
     
     if (productsError) throw productsError;
     
-    // Manual filtering in JavaScript if filters are provided
     let filteredProducts = productsData || [];
     
+    // Step 2: Apply any filters in JavaScript
     if (filters && filteredProducts.length > 0) {
       filteredProducts = filteredProducts.filter(product => {
         return Object.entries(filters).every(([key, value]) => {
@@ -40,7 +39,7 @@ export const fetchProducts = async (filters?: Record<string, any>) => {
       });
     }
     
-    // If we have products, get their images separately
+    // Step 3: If we have products, fetch their images separately
     if (filteredProducts.length > 0) {
       const productIds = filteredProducts.map(product => product.id);
       
@@ -51,7 +50,7 @@ export const fetchProducts = async (filters?: Record<string, any>) => {
       
       if (imagesError) throw imagesError;
       
-      // Merge the product images into their respective products
+      // Step 4: Combine the data manually
       const productsWithImages = filteredProducts.map(product => ({
         ...product,
         product_images: imagesData?.filter(img => img.product_id === product.id) || []
@@ -69,17 +68,30 @@ export const fetchProducts = async (filters?: Record<string, any>) => {
 
 export const fetchProductById = async (id: string) => {
   try {
-    const { data, error } = await supabase
+    // Fetch the product first
+    const { data: productData, error: productError } = await supabase
       .from("products")
-      .select(`
-        *,
-        product_images(*)
-      `)
+      .select('*')
       .eq("id", id)
       .single();
     
-    if (error) throw error;
-    return data;
+    if (productError) throw productError;
+    
+    // Fetch the product images
+    const { data: imagesData, error: imagesError } = await supabase
+      .from("product_images")
+      .select('*')
+      .eq('product_id', id);
+    
+    if (imagesError) throw imagesError;
+    
+    // Combine the data
+    const productWithImages = {
+      ...productData,
+      product_images: imagesData || []
+    };
+    
+    return productWithImages;
   } catch (error) {
     console.error("Error fetching product:", error);
     throw error;
