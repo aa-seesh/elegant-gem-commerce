@@ -107,7 +107,10 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
 // Using a simpler query structure to avoid deep type instantiation
 export const fetchAllOrders = async (filters?: Record<string, any>) => {
   try {
-    let query = supabase.from("orders");
+    // First select from orders to get a proper query builder
+    let query = supabase
+      .from("orders")
+      .select('*');
     
     // Apply filters if provided
     if (filters) {
@@ -118,10 +121,11 @@ export const fetchAllOrders = async (filters?: Record<string, any>) => {
       });
     }
 
+    // Order by created_at
+    query = query.order("created_at", { ascending: false });
+    
     // Get the orders first
-    const { data: ordersData, error: ordersError } = await query
-      .select('*')
-      .order("created_at", { ascending: false });
+    const { data: ordersData, error: ordersError } = await query;
     
     if (ordersError) throw ordersError;
     

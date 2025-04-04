@@ -22,7 +22,10 @@ export interface ProductInput {
 // Using a simpler query structure to avoid deep type instantiation
 export const fetchProducts = async (filters?: Record<string, any>) => {
   try {
-    let query = supabase.from("products");
+    // First select from products to get a proper query builder
+    let query = supabase
+      .from("products")
+      .select('*');
     
     // Apply filters if provided
     if (filters) {
@@ -34,7 +37,7 @@ export const fetchProducts = async (filters?: Record<string, any>) => {
     }
     
     // Get products first
-    const { data: productsData, error: productsError } = await query.select('*');
+    const { data: productsData, error: productsError } = await query;
     
     if (productsError) throw productsError;
     
