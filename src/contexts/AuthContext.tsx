@@ -25,6 +25,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
       }
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Existing session:", session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -42,9 +44,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      console.log("Signing in with:", email);
+      const { error, data } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password,
+        options: {
+          // Ensure redirect works for hosted environments
+          redirectTo: window.location.origin
+        }
+      });
+      
       if (error) throw error;
+      console.log("Sign in successful:", data?.user?.email);
     } catch (error: any) {
+      console.error("Sign in error:", error.message);
       toast({
         title: "Error signing in",
         description: error.message,
@@ -56,6 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
+      console.log("Signing up with:", email);
       const { error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -63,16 +77,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           data: {
             first_name: firstName,
             last_name: lastName
-          }
+          },
+          // Ensure redirect works for hosted environments
+          redirectTo: window.location.origin
         }
       });
+      
       if (error) throw error;
       
       toast({
         title: "Sign up successful",
         description: "Check your email to confirm your account.",
       });
+      console.log("Sign up successful for:", email);
     } catch (error: any) {
+      console.error("Sign up error:", error.message);
       toast({
         title: "Error signing up",
         description: error.message,
@@ -84,8 +103,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signOut = async () => {
     try {
+      console.log("Signing out user");
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      console.log("Sign out successful");
     } catch (error: any) {
       console.error('Error signing out:', error);
       throw error;
