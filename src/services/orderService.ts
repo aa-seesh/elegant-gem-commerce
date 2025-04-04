@@ -1,11 +1,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface OrderInput {
   user_id: string;
   total: number;
-  shipping_address: Record<string, any>;
-  billing_address: Record<string, any>;
+  shipping_address: Json;
+  billing_address: Json;
   payment_method: string;
   status?: string;
 }
@@ -17,26 +18,26 @@ export interface OrderItemInput {
   price: number;
 }
 
-export const createOrder = async (orderData: OrderInput, orderItems: OrderItemInput[]) => {
+export const createOrder = async (orderData: OrderInput, orderItems: Omit<OrderItemInput, "order_id">[]) => {
   try {
-    // Start a Supabase transaction
+    // Start with creating the order
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .insert(orderData)
+      .insert(orderData as any)
       .select()
       .single();
     
     if (orderError) throw orderError;
     
     // Add order items with the created order ID
-    const items = orderItems.map(item => ({
+    const itemsWithOrderId = orderItems.map(item => ({
       ...item,
       order_id: order.id
     }));
     
     const { data: itemsData, error: itemsError } = await supabase
       .from("order_items")
-      .insert(items)
+      .insert(itemsWithOrderId as any)
       .select();
     
     if (itemsError) throw itemsError;

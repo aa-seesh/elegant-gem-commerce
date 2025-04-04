@@ -1,6 +1,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
+// Define proper types based on the Supabase schema
 export interface ProductInput {
   name: string;
   description: string;
@@ -11,10 +13,10 @@ export interface ProductInput {
   attributes?: Record<string, any>;
   featured?: boolean;
   in_stock?: boolean;
-  material_type?: string;
+  material_type?: Database["public"]["Enums"]["material_type"] | null;
   weight?: number;
   making_charge?: number;
-  pricing_model?: 'flat' | 'weight_based';
+  pricing_model?: Database["public"]["Enums"]["pricing_model"];
 }
 
 export const fetchProducts = async (filters?: Record<string, any>) => {
@@ -66,7 +68,7 @@ export const createProduct = async (product: ProductInput) => {
   try {
     const { data, error } = await supabase
       .from("products")
-      .insert(product)
+      .insert(product as any)
       .select()
       .single();
     
@@ -82,7 +84,7 @@ export const updateProduct = async (id: string, updates: Partial<ProductInput>) 
   try {
     const { data, error } = await supabase
       .from("products")
-      .update(updates)
+      .update(updates as any)
       .eq("id", id)
       .select()
       .single();
