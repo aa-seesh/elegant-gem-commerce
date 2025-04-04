@@ -19,26 +19,46 @@ export interface ProductInput {
   pricing_model?: Database["public"]["Enums"]["pricing_model"];
 }
 
+// Using a simpler query structure to avoid deep type instantiation
 export const fetchProducts = async (filters?: Record<string, any>) => {
   try {
-    let query = supabase.from("products").select(`
-      *,
-      product_images(*)
-    `);
-
+    let query = supabase.from("products");
+    
     // Apply filters if provided
     if (filters) {
-      for (const [key, value] of Object.entries(filters)) {
+      Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           query = query.eq(key, value);
         }
-      }
+      });
     }
-
-    const { data, error } = await query;
     
-    if (error) throw error;
-    return data;
+    // Get products first
+    const { data: productsData, error: productsError } = await query.select('*');
+    
+    if (productsError) throw productsError;
+    
+    // If we have products, get their images separately
+    if (productsData && productsData.length > 0) {
+      const productIds = productsData.map(product => product.id);
+      
+      const { data: imagesData, error: imagesError } = await supabase
+        .from("product_images")
+        .select('*')
+        .in('product_id', productIds);
+      
+      if (imagesError) throw imagesError;
+      
+      // Merge the product images into their respective products
+      const productsWithImages = productsData.map(product => ({
+        ...product,
+        product_images: imagesData?.filter(img => img.product_id === product.id) || []
+      }));
+      
+      return productsWithImages;
+    }
+    
+    return productsData || [];
   } catch (error) {
     console.error("Error fetching products:", error);
     throw error;
