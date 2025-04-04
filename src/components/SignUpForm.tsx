@@ -10,14 +10,26 @@ import { toast } from "@/components/ui/use-toast";
 interface SignUpFormProps {
   onSuccess?: () => void;
   onSwitch?: () => void;
+  initialEmail?: string;
+  initialPassword?: string;
+  initialFirstName?: string;
+  initialLastName?: string;
 }
 
-const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitch }) => {
+const SignUpForm: React.FC<SignUpFormProps> = ({ 
+  onSuccess, 
+  onSwitch, 
+  initialEmail = "",
+  initialPassword = "",
+  initialFirstName = "",
+  initialLastName = ""
+}) => {
   const { signUp } = useAuth();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState(initialPassword);
+  const [confirmPassword, setConfirmPassword] = useState(initialPassword);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +47,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitch }) => {
     setIsLoading(true);
 
     try {
-      await signUp(email, password, name);
+      await signUp(email, password, firstName, lastName);
       toast({
         title: "Account created!",
         description: "Your account has been successfully created.",
@@ -64,13 +76,24 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitch }) => {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="firstName">First Name</Label>
             <Input
-              id="name"
+              id="firstName"
               type="text"
-              placeholder="John Doe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              placeholder="John"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lastName">Last Name</Label>
+            <Input
+              id="lastName"
+              type="text"
+              placeholder="Doe"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               required
             />
           </div>

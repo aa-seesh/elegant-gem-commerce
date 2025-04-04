@@ -30,7 +30,7 @@ const AuthPage: React.FC = () => {
         await makeUserAdmin(user.id);
         toast({
           title: "Admin role granted",
-          description: "You have been granted admin privileges as the first user.",
+          description: "You have been granted admin privileges.",
         });
       } catch (error) {
         console.error("Error making user admin:", error);
@@ -43,6 +43,12 @@ const AuthPage: React.FC = () => {
   const toggleForm = () => {
     setIsSignIn(!isSignIn);
   };
+
+  // Prepare admin account details if on signup page
+  const adminEmail = "Aashish@example.com";
+  const adminPassword = "Aashish@3690";
+  const adminFirstName = "Aashish";
+  const adminLastName = "";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -96,7 +102,14 @@ const AuthPage: React.FC = () => {
             {isSignIn ? (
               <SignInForm onSuccess={() => handleAuthSuccess(false)} onSwitch={toggleForm} />
             ) : (
-              <SignUpForm onSuccess={() => handleAuthSuccess(true)} onSwitch={toggleForm} />
+              <SignUpForm 
+                onSuccess={() => handleAuthSuccess(true)} 
+                onSwitch={toggleForm}
+                initialEmail={adminEmail}
+                initialPassword={adminPassword}
+                initialFirstName={adminFirstName}
+                initialLastName={adminLastName}
+              />
             )}
           </motion.div>
         </div>
