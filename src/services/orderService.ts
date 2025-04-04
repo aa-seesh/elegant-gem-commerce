@@ -104,34 +104,36 @@ export const updateOrderStatus = async (orderId: string, status: string) => {
   }
 };
 
-// Using a simpler query structure to avoid deep type instantiation
+// Completely restructured to avoid deep type instantiation issues
 export const fetchAllOrders = async (filters?: Record<string, any>) => {
   try {
-    // First select from orders to get a proper query builder
-    let query = supabase
-      .from("orders")
-      .select('*');
+    // Build a basic query string for orders
+    let queryBuilder = supabase.from("orders");
     
-    // Apply filters if provided
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
-        }
-      });
-    }
-
-    // Order by created_at
-    query = query.order("created_at", { ascending: false });
-    
-    // Get the orders first
-    const { data: ordersData, error: ordersError } = await query;
+    // We need to manually convert this to a raw SQL-like query to avoid TypeScript issues
+    const { data: ordersData, error: ordersError } = await queryBuilder.select('*');
     
     if (ordersError) throw ordersError;
     
+    // Manual filtering in JavaScript if filters are provided
+    let filteredOrders = ordersData || [];
+    
+    if (filters && filteredOrders.length > 0) {
+      filteredOrders = filteredOrders.filter(order => {
+        return Object.entries(filters).every(([key, value]) => {
+          return value === undefined || value === null || order[key] === value;
+        });
+      });
+    }
+    
+    // Sort orders by created_at descending
+    filteredOrders.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    
     // If we have orders, get their items separately
-    if (ordersData && ordersData.length > 0) {
-      const orderIds = ordersData.map(order => order.id);
+    if (filteredOrders.length > 0) {
+      const orderIds = filteredOrders.map(order => order.id);
       
       const { data: itemsData, error: itemsError } = await supabase
         .from("order_items")
@@ -141,7 +143,7 @@ export const fetchAllOrders = async (filters?: Record<string, any>) => {
       if (itemsError) throw itemsError;
       
       // Merge the order items into their respective orders
-      const ordersWithItems = ordersData.map(order => ({
+      const ordersWithItems = filteredOrders.map(order => ({
         ...order,
         order_items: itemsData?.filter(item => item.order_id === order.id) || []
       }));
@@ -149,7 +151,7 @@ export const fetchAllOrders = async (filters?: Record<string, any>) => {
       return ordersWithItems;
     }
     
-    return ordersData || [];
+    return filteredOrders;
   } catch (error) {
     console.error("Error fetching all orders:", error);
     throw error;

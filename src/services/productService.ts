@@ -19,31 +19,30 @@ export interface ProductInput {
   pricing_model?: Database["public"]["Enums"]["pricing_model"];
 }
 
-// Using a simpler query structure to avoid deep type instantiation
+// Completely restructured to avoid deep type instantiation issues
 export const fetchProducts = async (filters?: Record<string, any>) => {
   try {
-    // First select from products to get a proper query builder
-    let query = supabase
+    // Fetch all products
+    const { data: productsData, error: productsError } = await supabase
       .from("products")
       .select('*');
     
-    // Apply filters if provided
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
-        }
+    if (productsError) throw productsError;
+    
+    // Manual filtering in JavaScript if filters are provided
+    let filteredProducts = productsData || [];
+    
+    if (filters && filteredProducts.length > 0) {
+      filteredProducts = filteredProducts.filter(product => {
+        return Object.entries(filters).every(([key, value]) => {
+          return value === undefined || value === null || product[key] === value;
+        });
       });
     }
     
-    // Get products first
-    const { data: productsData, error: productsError } = await query;
-    
-    if (productsError) throw productsError;
-    
     // If we have products, get their images separately
-    if (productsData && productsData.length > 0) {
-      const productIds = productsData.map(product => product.id);
+    if (filteredProducts.length > 0) {
+      const productIds = filteredProducts.map(product => product.id);
       
       const { data: imagesData, error: imagesError } = await supabase
         .from("product_images")
@@ -53,7 +52,7 @@ export const fetchProducts = async (filters?: Record<string, any>) => {
       if (imagesError) throw imagesError;
       
       // Merge the product images into their respective products
-      const productsWithImages = productsData.map(product => ({
+      const productsWithImages = filteredProducts.map(product => ({
         ...product,
         product_images: imagesData?.filter(img => img.product_id === product.id) || []
       }));
@@ -61,7 +60,7 @@ export const fetchProducts = async (filters?: Record<string, any>) => {
       return productsWithImages;
     }
     
-    return productsData || [];
+    return filteredProducts;
   } catch (error) {
     console.error("Error fetching products:", error);
     throw error;
