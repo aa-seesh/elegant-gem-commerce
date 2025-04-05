@@ -22,24 +22,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("Auth state changed:", event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Initialize authentication state
+    const initAuth = async () => {
+      // Log important information about the environment
+      console.log("Auth Provider initializing");
+      console.log("Current origin:", window.location.origin);
+      console.log("Current URL:", window.location.href);
+      
+      // Set up auth state listener FIRST
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          console.log("Auth state changed:", event, session?.user?.email);
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
+      );
+
+      // THEN check for existing session
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("Error getting initial session:", error.message);
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Existing session:", session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
+      
+      console.log("Existing session check:", data?.session ? "Session found" : "No session");
+      if (data?.session?.user) {
+        console.log("User logged in:", data.session.user.email);
+      }
+      
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
       setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    };
+    
+    initAuth();
+    
+    // Cleanup subscription on unmount
+    return () => {
+      console.log("Auth Provider cleaning up subscription");
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -69,6 +90,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
       console.log("Signing up with:", email);
+      console.log("Redirect URL will be:", `${window.location.origin}/auth/callback`);
+      
       const { error } = await supabase.auth.signUp({ 
         email, 
         password,
