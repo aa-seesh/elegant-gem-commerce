@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/NotFound";
 import Index from "@/pages/Index";
 import CollectionsPage from "@/pages/CollectionsPage";
+import AuthCallback from "@/pages/AuthCallback";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/orders" element={<AdminOrders />} />
             <Route path="/admin/products" element={<AdminProducts />} />

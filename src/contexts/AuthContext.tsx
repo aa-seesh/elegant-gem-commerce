@@ -48,6 +48,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { error, data } = await supabase.auth.signInWithPassword({ 
         email, 
         password,
+        options: {
+          captchaToken: undefined
+        }
       });
       
       if (error) throw error;
@@ -74,7 +77,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             first_name: firstName,
             last_name: lastName
           },
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
       
