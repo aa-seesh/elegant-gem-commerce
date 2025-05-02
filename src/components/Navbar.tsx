@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  ShoppingBag, 
   Heart, 
   Search, 
   User, 
@@ -22,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import CartDrawer from "@/components/CartDrawer";
+import { useUser } from "@/contexts/UserContext";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,6 +30,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useUser();
   const { toast } = useToast();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
@@ -138,10 +140,14 @@ const Navbar = () => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {/* Admin link if user has admin rights */}
-                  <DropdownMenuItem asChild>
-                    <Link to="/admin" className="cursor-pointer">Admin Dashboard</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin" className="cursor-pointer">Admin Dashboard</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={handleSignOut} className="text-red-500 cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sign Out</span>
@@ -157,24 +163,19 @@ const Navbar = () => {
             )}
             
             <IconButton icon={<Heart />} tooltip="Wishlist" />
-            <IconButton icon={<ShoppingBag />} badge={0} tooltip="Cart" />
+            <CartDrawer />
           </div>
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center space-x-2">
-            <Button variant="ghost" size="icon" className="hover:text-gold relative">
-              <ShoppingBag className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 bg-ruby text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                0
-              </span>
-            </Button>
+            <CartDrawer />
             
             {user && (
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="hover:text-gold relative"
-                onClick={() => navigate('/auth')}
+                onClick={handleAuthClick}
               >
                 <div className="h-8 w-8 rounded-full bg-gold flex items-center justify-center text-white">
                   {user.email?.charAt(0).toUpperCase() || "U"}
