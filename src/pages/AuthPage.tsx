@@ -44,12 +44,6 @@ const AuthPage: React.FC = () => {
     setIsSignIn(!isSignIn);
   };
 
-  // Prepare admin account details if on signup page
-  const adminEmail = "Aashish@example.com";
-  const adminPassword = "Aashish@3690";
-  const adminFirstName = "Aashish";
-  const adminLastName = "";
-
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -105,10 +99,6 @@ const AuthPage: React.FC = () => {
               <SignUpForm 
                 onSuccess={() => handleAuthSuccess(true)} 
                 onSwitch={toggleForm}
-                initialEmail={adminEmail}
-                initialPassword={adminPassword}
-                initialFirstName={adminFirstName}
-                initialLastName={adminLastName}
               />
             )}
           </motion.div>

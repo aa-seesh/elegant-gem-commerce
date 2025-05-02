@@ -59,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     // Cleanup subscription on unmount
     return () => {
+      supabase.auth.onAuthStateChange(() => {}).data.subscription.unsubscribe();
       console.log("Auth Provider cleaning up subscription");
     };
   }, []);

@@ -13,6 +13,7 @@ import NotFound from "@/pages/NotFound";
 import Index from "@/pages/Index";
 import CollectionsPage from "@/pages/CollectionsPage";
 import AuthCallback from "@/pages/AuthCallback";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 function App() {
   return (
@@ -23,12 +24,51 @@ function App() {
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/orders" element={<AdminOrders />} />
-            <Route path="/admin/products" element={<AdminProducts />} />
-            <Route path="/admin/product-settings" element={<AdminProductSettings />} />
-            <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="/collections" element={<CollectionsPage />} />
+            
+            {/* Admin Routes with Protection */}
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/orders" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminOrders />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/products" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminProducts />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/product-settings" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminProductSettings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/settings" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminSettings />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* 404 route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />

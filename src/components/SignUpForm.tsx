@@ -10,26 +10,18 @@ import { toast } from "@/components/ui/use-toast";
 interface SignUpFormProps {
   onSuccess?: () => void;
   onSwitch?: () => void;
-  initialEmail?: string;
-  initialPassword?: string;
-  initialFirstName?: string;
-  initialLastName?: string;
 }
 
 const SignUpForm: React.FC<SignUpFormProps> = ({ 
   onSuccess, 
-  onSwitch, 
-  initialEmail = "",
-  initialPassword = "",
-  initialFirstName = "",
-  initialLastName = ""
+  onSwitch
 }) => {
   const { signUp } = useAuth();
-  const [firstName, setFirstName] = useState(initialFirstName);
-  const [lastName, setLastName] = useState(initialLastName);
-  const [email, setEmail] = useState(initialEmail);
-  const [password, setPassword] = useState(initialPassword);
-  const [confirmPassword, setConfirmPassword] = useState(initialPassword);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ShoppingBag, 
@@ -8,14 +8,28 @@ import {
   Search, 
   User, 
   Menu, 
-  X 
+  X,
+  LogOut,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/components/ui/use-toast";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -37,6 +51,32 @@ const Navbar = () => {
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: "Error signing out",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAuthClick = () => {
+    if (user) {
+      // If user is logged in, show dropdown (handled by DropdownMenu)
+    } else {
+      // If not logged in, redirect to auth page
+      navigate('/auth');
+    }
+  };
 
   return (
     <motion.nav 
@@ -68,7 +108,54 @@ const Navbar = () => {
           {/* Icons */}
           <div className="hidden md:flex items-center space-x-4">
             <IconButton icon={<Search />} tooltip="Search" />
-            <IconButton icon={<User />} tooltip="Account" />
+            
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="hover:text-gold relative group">
+                    <div className="flex items-center">
+                      <div className="h-8 w-8 rounded-full bg-gold flex items-center justify-center text-white">
+                        {user.email?.charAt(0).toUpperCase() || "U"}
+                      </div>
+                      <ChevronDown className="ml-1 h-4 w-4" />
+                    </div>
+                    <span className="sr-only">User menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5 text-sm font-medium">
+                    {user.email}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/account" className="cursor-pointer">My Account</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/orders" className="cursor-pointer">My Orders</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/wishlist" className="cursor-pointer">Wishlist</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {/* Admin link if user has admin rights */}
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="cursor-pointer">Admin Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="text-red-500 cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <IconButton 
+                icon={<User />} 
+                tooltip="Account" 
+                onClick={() => navigate('/auth')}
+              />
+            )}
+            
             <IconButton icon={<Heart />} tooltip="Wishlist" />
             <IconButton icon={<ShoppingBag />} badge={0} tooltip="Cart" />
           </div>
@@ -81,6 +168,20 @@ const Navbar = () => {
                 0
               </span>
             </Button>
+            
+            {user && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="hover:text-gold relative"
+                onClick={() => navigate('/auth')}
+              >
+                <div className="h-8 w-8 rounded-full bg-gold flex items-center justify-center text-white">
+                  {user.email?.charAt(0).toUpperCase() || "U"}
+                </div>
+              </Button>
+            )}
+            
             <Button variant="ghost" size="icon" onClick={toggleMenu}>
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
@@ -116,9 +217,28 @@ const Navbar = () => {
                   <Button variant="ghost" size="icon" className="hover:text-gold">
                     <Search className="h-5 w-5" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="hover:text-gold">
-                    <User className="h-5 w-5" />
-                  </Button>
+                  {!user ? (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="hover:text-gold"
+                      onClick={() => {
+                        toggleMenu();
+                        navigate('/auth');
+                      }}
+                    >
+                      <User className="h-5 w-5" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      onClick={handleSignOut} 
+                      className="hover:text-red-500 flex items-center"
+                    >
+                      <LogOut className="h-5 w-5 mr-2" />
+                      <span>Sign Out</span>
+                    </Button>
+                  )}
                   <Button variant="ghost" size="icon" className="hover:text-gold">
                     <Heart className="h-5 w-5" />
                   </Button>
@@ -175,14 +295,21 @@ const MobileNavLink = ({ to, label, onClick }: { to: string; label: string; onCl
 const IconButton = ({ 
   icon, 
   badge, 
-  tooltip 
+  tooltip,
+  onClick
 }: { 
   icon: React.ReactNode; 
   badge?: number;
   tooltip?: string;
+  onClick?: () => void;
 }) => {
   return (
-    <Button variant="ghost" size="icon" className="hover:text-gold relative group">
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      className="hover:text-gold relative group"
+      onClick={onClick}
+    >
       {icon}
       {badge !== undefined && badge > 0 && (
         <span className="absolute -top-1 -right-1 bg-ruby text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">

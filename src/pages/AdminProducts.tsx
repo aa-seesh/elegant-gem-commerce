@@ -17,24 +17,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProductsManager } from "@/components/admin/ProductsManager";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@/contexts/UserContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 
 const AdminProducts = () => {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useUser();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Redirect to login if not authenticated
-  React.useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
       navigate('/auth');
     } catch (error: any) {
       toast({
@@ -44,8 +43,6 @@ const AdminProducts = () => {
       });
     }
   };
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -130,10 +127,10 @@ const AdminProducts = () => {
           {/* Admin Menu */}
           <div className="flex items-center">
             <span className="mr-2 hidden md:inline-block">
-              {user.email || "Admin User"}
+              {user?.email || "Admin User"}
             </span>
             <div className="h-8 w-8 rounded-full bg-gold flex items-center justify-center text-white">
-              {user.email?.charAt(0).toUpperCase() || "A"}
+              {user?.email?.charAt(0).toUpperCase() || "A"}
             </div>
           </div>
         </header>
